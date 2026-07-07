@@ -34,25 +34,27 @@
 </head>
 <body>
     <div id="ui-panel">
-        <h2>Mô phỏng Đồ án (V5 - Hoàn thiện)</h2>
+        <h2>Mô phỏng Đồ án (V6 - Full Cảm biến)</h2>
         
-        <p class="step-title">1. Thao tác tay (Người dùng)</p>
+        <p class="step-title">1. Tương tác Vật lý</p>
         <button onclick="setLidState('open')">Nhấc nắp hộp lên</button>
         <button onclick="setLidState('close')">Đậy nắp hộp xuống</button>
+        <button onclick="triggerVibration()" style="background: #f6c23e; color: #333;">Cố tình cạy / Lắc hộp</button>
+
+        <p class="step-title" style="margin-top: 15px;">2. Cảm biến Input -> MQTT</p>
+        <button onclick="triggerTouch()" style="background: #36b9cc;">Chạm Cảm biến TTP223 (Input 1)</button>
         
-        <p class="step-title" style="margin-top: 25px;">2. Lệnh MQTT (ESP32)</p>
-        <button class="btn-lock" onclick="setServoState('lock')">Khóa hộp (Đè chốt)</button>
-        <button class="btn-unlock" onclick="setServoState('unlock')">Mở khóa (Thu chốt vào trong)</button>
+        <p class="step-title" style="margin-top: 15px;">3. Lệnh MQTT -> Output 1</p>
+        <button class="btn-lock" onclick="setServoState('lock')">ESP32 nhận lệnh Khóa</button>
+        <button class="btn-unlock" onclick="setServoState('unlock')">ESP32 nhận lệnh Mở</button>
 
         <div id="alert-box"></div>
 
-        <div class="legend">
-            <strong>Bản vẽ cơ khí:</strong><br>
-            <div><span style="background: rgba(78, 115, 223, 0.1); border: 1.5px solid #4e73df;"></span> Thân & Nắp hộp nhựa</div>
-            <div><span style="background: #202020;"></span> Điện thoại</div>
-            <div><span style="background: #e74a3b;"></span> <b>Móc chữ L</b> (Cố định vào nắp)</div>
-            <div><span style="background: #343a40;"></span> Thân Servo MG996R</div>
-            <div><span style="background: #f6c23e;"></span> <b>Tay đòn Servo</b> (Nhôm CNC)</div>
+        <div class="legend" style="margin-top: 10px; font-size: 12px;">
+            <strong>Chú thích:</strong><br>
+            <div><span style="background: #36b9cc;"></span> <b>TTP223</b> (Cảm biến chạm ngoài)</div>
+            <div><span style="background: #4e73df;"></span> <b>SW-420</b> (Cảm biến rung bên trong)</div>
+            <div><span style="background: #e74a3b;"></span> Móc L | <span style="background: #343a40;"></span> Servo | <span style="background: #f6c23e;"></span> Tay đòn</div>
         </div>
     </div>
 
@@ -113,6 +115,26 @@
         const phoneScreen = new THREE.Mesh(new THREE.BoxGeometry(7.5, 0.42, 13.5), new THREE.MeshPhysicalMaterial({ color: 0x111111, roughness: 0.1, clearcoat: 1.0 }));
         phoneGroup.add(phoneScreen);
 
+        // --- VẬT LIỆU MỚI CHO CẢM BIẾN ---
+        const touchSensorMat = new THREE.MeshLambertMaterial({ color: 0x36b9cc }); // Màu lục lam cho TTP223
+        const vibSensorMat = new THREE.MeshLambertMaterial({ color: 0x4e73df });   // Màu xanh dương cho SW-420
+
+        // B1. Cảm biến chạm TTP223 (Gắn ở mặt ngoài vách trước của hộp)
+        const touchSensor = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 0.5), touchSensorMat);
+        touchSensor.position.set(5, 5, 8.25); // Nằm ngoài cùng vách Z=8
+        scene.add(touchSensor);
+
+        // B2. Cảm biến rung SW-420 (Gắn ở vách trong của hộp)
+        const vibSensor = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3, 1), vibSensorMat);
+        vibSensor.position.set(-8, 3, -7.5); // Nằm góc trong cùng
+        scene.add(vibSensor);
+        
+        // Biến lưu trữ hiệu ứng rung
+        let isShaking = false;
+        let shakeFrames = 0;
+        const originalBasePos = new THREE.Vector3(0, 5, 0);
+        const originalLidPos = new THREE.Vector3(0, 0, 0); // Tương đối so với lidGroup
+
         // C. Nắp hộp
         const lidGroup = new THREE.Group();
         lidGroup.position.set(0, 10, 0); 
@@ -155,29 +177,44 @@
         horn.position.set(2, 0, 0); 
         pivot.add(horn);
 
-        // --- 5. LOGIC ĐIỀU KHIỂN & VẬT LÝ ---
+       // --- 5. LOGIC ĐIỀU KHIỂN & VẬT LÝ ---
         let targetLidY = 10; 
-        
-        // SỬA LỖI XUYÊN TƯỜNG: 
-        // Góc +Math.PI/2 sẽ xoay tay đòn quặp ngược vào TRONG không gian hộp (-Z), 
-        // hoàn toàn không đâm ra ngoài thành hộp phía trước (+Z) nữa.
-        let targetHornAngle = Math.PI / 2; 
+        let targetHornAngle = Math.PI / 2; // Mặc định mở
         pivot.rotation.y = targetHornAngle;
 
         const alertBox = document.getElementById('alert-box');
 
-        function showAlert(msg) {
+        function showAlert(msg, color = '#e74a3b') {
+            alertBox.style.color = color;
             alertBox.innerText = msg;
             setTimeout(() => alertBox.innerText = '', 4000);
         }
 
+        // CẢM BIẾN 1: TTP223
+        window.triggerTouch = function() {
+            if (targetLidY > 10.1) {
+                showAlert("Vui lòng đậy nắp trước khi bấm khóa!", '#f6c23e');
+                return;
+            }
+            showAlert("Input 1 kích hoạt! Đang gửi MQTT báo khóa...", '#36b9cc');
+            // Tự động kích hoạt Servo sau 1 giây (Mô phỏng độ trễ mạng MQTT)
+            setTimeout(() => { setServoState('lock'); }, 1000);
+        }
+
+        // CẢM BIẾN 2: SW-420 (Rung lắc)
+        window.triggerVibration = function() {
+            showAlert("CẢNH BÁO AN NINH: Phát hiện rung lắc! Đã gửi Email.", '#e74a3b');
+            isShaking = true;
+            shakeFrames = 30; // Rung trong 30 khung hình
+        }
+
         window.setLidState = function(state) {
-            // Kiểm tra rào cản vật lý: Nếu góc quay là 0 (đang khóa đè lên móc đỏ)
+            // Logic chống cạy: Nếu đang khóa mà cố tình mở -> Kích hoạt cảm biến rung
             if (targetHornAngle < 0.1 && targetHornAngle > -0.1 && state === 'open') {
-                showAlert("NẮP BỊ KẸT! Tay đòn (Vàng) đang đè chặt lên gờ Móc (Đỏ).");
-                // Hiệu ứng giật (Mô phỏng lực kéo bị chặn lại)
-                lidGroup.position.y = 10.2; 
-                setTimeout(() => lidGroup.position.y = 10, 100);
+                triggerVibration();
+                showAlert("CỐ TÌNH CẠY MỞ! Nắp bị kẹt và hệ thống an ninh đã kích hoạt.");
+                lidGroup.position.y = 10.3; // Giật nhẹ nắp lên
+                setTimeout(() => lidGroup.position.y = 10, 150);
                 return;
             }
             targetLidY = (state === 'open') ? 17 : 10;
@@ -185,19 +222,39 @@
 
         window.setServoState = function(state) {
             if (targetLidY > 10.1 && state === 'lock') {
-                showAlert("KHÔNG THỂ KHÓA! Hãy đậy sát nắp hộp để mấu gài hạ xuống đúng vị trí.");
+                showAlert("KHÔNG THỂ KHÓA! Hãy đậy sát nắp hộp.");
                 return;
             }
-            // Khóa (0 độ): Tay đòn chĩa ngang đè lên móc đỏ
-            // Mở (+90 độ): Thu tay đòn ngoặt sâu vào bên trong hộp (-Z)
             targetHornAngle = (state === 'lock') ? 0 : Math.PI / 2;
         }
 
-        // Vòng lặp Render (Lerp Animation)
+        // Vòng lặp Render (Lerp Animation + Shake Effect)
         function animate() {
             requestAnimationFrame(animate);
+            
+            // 1. Hiệu ứng đóng mở nắp & xoay servo
             lidGroup.position.y += (targetLidY - lidGroup.position.y) * 0.15;
             pivot.rotation.y += (targetHornAngle - pivot.rotation.y) * 0.15;
+
+            // 2. Hiệu ứng rung lắc toàn bộ hộp (Của SW-420)
+            if (isShaking && shakeFrames > 0) {
+                const shakeX = (Math.random() - 0.5) * 0.8;
+                const shakeZ = (Math.random() - 0.5) * 0.8;
+                
+                baseBox.position.set(originalBasePos.x + shakeX, originalBasePos.y, originalBasePos.z + shakeZ);
+                // Giữ nắp dính liền với thân khi rung
+                if(targetLidY === 10) {
+                    lidMesh.position.set(originalLidPos.x + shakeX, originalLidPos.y, originalLidPos.z + shakeZ);
+                }
+                shakeFrames--;
+            } else if (isShaking && shakeFrames <= 0) {
+                // Trả về vị trí cũ khi hết rung
+                isShaking = false;
+                baseBox.position.copy(originalBasePos);
+                lidMesh.position.copy(originalLidPos);
+                lidMesh.position.y = 0.4; // Offset cố định của mesh
+            }
+
             renderer.render(scene, camera);
         }
         animate();
