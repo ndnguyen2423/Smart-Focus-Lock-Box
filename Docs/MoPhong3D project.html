@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Mô phỏng 3D V5: Cơ học Thực tế (Khắc phục tuyệt đối lỗi xuyên tường)</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #ui-panel { 
+            position: absolute; top: 20px; left: 20px; z-index: 100; 
+            background: rgba(255, 255, 255, 0.95); padding: 25px; 
+            border-radius: 12px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); 
+            border: 1px solid #e3e6f0; width: 350px; backdrop-filter: blur(5px);
+        }
+        button { 
+            display: block; width: 100%; margin-bottom: 12px; padding: 12px; 
+            cursor: pointer; font-weight: bold; background: #4e73df; 
+            color: white; border: none; border-radius: 6px; font-size: 14px;
+            transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button:hover { transform: translateY(-1px); filter: brightness(1.1); box-shadow: 0 4px 6px rgba(0,0,0,0.15); }
+        button:active { transform: translateY(1px); box-shadow: none; }
+        
+        .btn-lock { background: #1cc88a; }
+        .btn-unlock { background: #e74a3b; }
+
+        .legend { margin-top: 20px; font-size: 13px; color: #5a5c69; line-height: 1.8; }
+        .legend span { display: inline-block; width: 16px; height: 16px; margin-right: 10px; vertical-align: middle; border-radius: 4px;}
+        h2 { margin-top: 0; font-size: 17px; color: #333; border-bottom: 2px solid #eaecf4; padding-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;}
+        .step-title { font-size: 13px; font-weight: 700; color: #4e73df; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+        #alert-box { color: #e74a3b; font-size: 13px; font-weight: bold; margin-top: 10px; min-height: 38px; text-align: center; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+    <div id="ui-panel">
+        <h2>Mô phỏng Đồ án (V5 - Hoàn thiện)</h2>
+        
+        <p class="step-title">1. Thao tác tay (Người dùng)</p>
+        <button onclick="setLidState('open')">Nhấc nắp hộp lên</button>
+        <button onclick="setLidState('close')">Đậy nắp hộp xuống</button>
+        
+        <p class="step-title" style="margin-top: 25px;">2. Lệnh MQTT (ESP32)</p>
+        <button class="btn-lock" onclick="setServoState('lock')">Khóa hộp (Đè chốt)</button>
+        <button class="btn-unlock" onclick="setServoState('unlock')">Mở khóa (Thu chốt vào trong)</button>
+
+        <div id="alert-box"></div>
+
+        <div class="legend">
+            <strong>Bản vẽ cơ khí:</strong><br>
+            <div><span style="background: rgba(78, 115, 223, 0.1); border: 1.5px solid #4e73df;"></span> Thân & Nắp hộp nhựa</div>
+            <div><span style="background: #202020;"></span> Điện thoại</div>
+            <div><span style="background: #e74a3b;"></span> <b>Móc chữ L</b> (Cố định vào nắp)</div>
+            <div><span style="background: #343a40;"></span> Thân Servo MG996R</div>
+            <div><span style="background: #f6c23e;"></span> <b>Tay đòn Servo</b> (Nhôm CNC)</div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. KHỞI TẠO SCENE & CAMERA ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf4f6f9);
+        
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(20, 25, 35); 
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 5, 0);
+        controls.update();
+
+        // --- 2. ÁNH SÁNG ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(15, 30, 20);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
+
+        // --- 3. VẬT LIỆU ---
+        const boxMat = new THREE.MeshPhysicalMaterial({ color: 0x4e73df, transparent: true, opacity: 0.15, side: THREE.DoubleSide, roughness: 0.1 });
+        const edgeMat = new THREE.LineBasicMaterial({ color: 0x4e73df, opacity: 0.8, transparent: true });
+        const latchMat = new THREE.MeshLambertMaterial({ color: 0xe74a3b });
+        const servoMat = new THREE.MeshLambertMaterial({ color: 0x343a40 });
+        const hornMat = new THREE.MeshLambertMaterial({ color: 0xf6c23e });
+        const metalMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, metalness: 0.8, roughness: 0.2 });
+
+        function createEdges(mesh) {
+            const edges = new THREE.EdgesGeometry(mesh.geometry);
+            mesh.add(new THREE.LineSegments(edges, edgeMat));
+        }
+
+        // --- 4. DỰNG MÔ HÌNH VẬT LÝ CHI TIẾT ---
+        
+        // A. Thân hộp (Cố định, Kích thước X=20, Y=10, Z=16)
+        const baseGeo = new THREE.BoxGeometry(20, 10, 16);
+        const baseBox = new THREE.Mesh(baseGeo, boxMat);
+        baseBox.position.set(0, 5, 0);
+        createEdges(baseBox);
+        scene.add(baseBox);
+
+        // B. Điện thoại (Nằm dọc theo trục Z ở giữa hộp)
+        const phoneGroup = new THREE.Group();
+        phoneGroup.position.set(0, 0.4, 0); 
+        scene.add(phoneGroup);
+        const phoneBody = new THREE.Mesh(new THREE.BoxGeometry(8, 0.4, 14), new THREE.MeshLambertMaterial({ color: 0x333333 }));
+        phoneGroup.add(phoneBody);
+        const phoneScreen = new THREE.Mesh(new THREE.BoxGeometry(7.5, 0.42, 13.5), new THREE.MeshPhysicalMaterial({ color: 0x111111, roughness: 0.1, clearcoat: 1.0 }));
+        phoneGroup.add(phoneScreen);
+
+        // C. Nắp hộp
+        const lidGroup = new THREE.Group();
+        lidGroup.position.set(0, 10, 0); 
+        scene.add(lidGroup);
+        const lidMesh = new THREE.Mesh(new THREE.BoxGeometry(20, 0.8, 16), boxMat);
+        lidMesh.position.set(0, 0.4, 0);
+        createEdges(lidMesh);
+        lidGroup.add(lidMesh);
+
+        // D. MÓC CHỮ L ĐỎ (Gắn sát vách trước hộp Z=5.5)
+        const latchGroup = new THREE.Group();
+        lidGroup.add(latchGroup);
+        
+        // Cột thẳng đứng của móc
+        const latchVert = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3, 1.5), latchMat);
+        latchVert.position.set(0, -1.5, 5.5); 
+        latchGroup.add(latchVert);
+        
+        // Gờ móc ngang (Đưa dài về phía Servo để kẹp)
+        const latchLip = new THREE.Mesh(new THREE.BoxGeometry(3, 0.8, 1.5), latchMat);
+        latchLip.position.set(-0.75, -2.6, 5.5); 
+        latchGroup.add(latchLip);
+
+        // E. ĐỘNG CƠ SERVO (Gắn cùng trục Z=5.5 với móc)
+        const servo = new THREE.Mesh(new THREE.BoxGeometry(4, 5, 3), servoMat);
+        servo.position.set(-4.5, 5, 5.5); 
+        scene.add(servo);
+
+        // Trục kim loại quay
+        const axis = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.8, 16), metalMat);
+        axis.position.set(-4.5, 7.6, 5.5);
+        scene.add(axis);
+
+        // F. TAY ĐÒN SERVO VÀNG (Cơ chế đè chốt)
+        const pivot = new THREE.Group();
+        pivot.position.set(-4.5, 7.9, 5.5); // Nằm đè hoàn toàn lên gờ ngang màu đỏ
+        scene.add(pivot);
+
+        const horn = new THREE.Mesh(new THREE.BoxGeometry(5.5, 0.5, 1.2), hornMat);
+        horn.position.set(2, 0, 0); 
+        pivot.add(horn);
+
+        // --- 5. LOGIC ĐIỀU KHIỂN & VẬT LÝ ---
+        let targetLidY = 10; 
+        
+        // SỬA LỖI XUYÊN TƯỜNG: 
+        // Góc +Math.PI/2 sẽ xoay tay đòn quặp ngược vào TRONG không gian hộp (-Z), 
+        // hoàn toàn không đâm ra ngoài thành hộp phía trước (+Z) nữa.
+        let targetHornAngle = Math.PI / 2; 
+        pivot.rotation.y = targetHornAngle;
+
+        const alertBox = document.getElementById('alert-box');
+
+        function showAlert(msg) {
+            alertBox.innerText = msg;
+            setTimeout(() => alertBox.innerText = '', 4000);
+        }
+
+        window.setLidState = function(state) {
+            // Kiểm tra rào cản vật lý: Nếu góc quay là 0 (đang khóa đè lên móc đỏ)
+            if (targetHornAngle < 0.1 && targetHornAngle > -0.1 && state === 'open') {
+                showAlert("NẮP BỊ KẸT! Tay đòn (Vàng) đang đè chặt lên gờ Móc (Đỏ).");
+                // Hiệu ứng giật (Mô phỏng lực kéo bị chặn lại)
+                lidGroup.position.y = 10.2; 
+                setTimeout(() => lidGroup.position.y = 10, 100);
+                return;
+            }
+            targetLidY = (state === 'open') ? 17 : 10;
+        }
+
+        window.setServoState = function(state) {
+            if (targetLidY > 10.1 && state === 'lock') {
+                showAlert("KHÔNG THỂ KHÓA! Hãy đậy sát nắp hộp để mấu gài hạ xuống đúng vị trí.");
+                return;
+            }
+            // Khóa (0 độ): Tay đòn chĩa ngang đè lên móc đỏ
+            // Mở (+90 độ): Thu tay đòn ngoặt sâu vào bên trong hộp (-Z)
+            targetHornAngle = (state === 'lock') ? 0 : Math.PI / 2;
+        }
+
+        // Vòng lặp Render (Lerp Animation)
+        function animate() {
+            requestAnimationFrame(animate);
+            lidGroup.position.y += (targetLidY - lidGroup.position.y) * 0.15;
+            pivot.rotation.y += (targetHornAngle - pivot.rotation.y) * 0.15;
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
