@@ -1,60 +1,143 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
     <meta charset="UTF-8">
     <title>Mô phỏng 3D V5: Cơ học Thực tế (Khắc phục tuyệt đối lỗi xuyên tường)</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #f4f6f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        #ui-panel { 
-            position: absolute; top: 20px; left: 20px; z-index: 100; 
-            background: rgba(255, 255, 255, 0.95); padding: 25px; 
-            border-radius: 12px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); 
-            border: 1px solid #e3e6f0; width: 350px; backdrop-filter: blur(5px);
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #f4f6f9;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        button { 
-            display: block; width: 100%; margin-bottom: 12px; padding: 12px; 
-            cursor: pointer; font-weight: bold; background: #4e73df; 
-            color: white; border: none; border-radius: 6px; font-size: 14px;
-            transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        button:hover { transform: translateY(-1px); filter: brightness(1.1); box-shadow: 0 4px 6px rgba(0,0,0,0.15); }
-        button:active { transform: translateY(1px); box-shadow: none; }
-        
-        .btn-lock { background: #1cc88a; }
-        .btn-unlock { background: #e74a3b; }
 
-        .legend { margin-top: 20px; font-size: 13px; color: #5a5c69; line-height: 1.8; }
-        .legend span { display: inline-block; width: 16px; height: 16px; margin-right: 10px; vertical-align: middle; border-radius: 4px;}
-        h2 { margin-top: 0; font-size: 17px; color: #333; border-bottom: 2px solid #eaecf4; padding-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;}
-        .step-title { font-size: 13px; font-weight: 700; color: #4e73df; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
-        #alert-box { color: #e74a3b; font-size: 13px; font-weight: bold; margin-top: 10px; min-height: 38px; text-align: center; }
+        #ui-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e3e6f0;
+            width: 350px;
+            backdrop-filter: blur(5px);
+        }
+
+        button {
+            display: block;
+            width: 100%;
+            margin-bottom: 12px;
+            padding: 12px;
+            cursor: pointer;
+            font-weight: bold;
+            background: #4e73df;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+            filter: brightness(1.1);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+        }
+
+        button:active {
+            transform: translateY(1px);
+            box-shadow: none;
+        }
+
+        .btn-lock {
+            background: #1cc88a;
+        }
+
+        .btn-unlock {
+            background: #e74a3b;
+        }
+
+        .legend {
+            margin-top: 20px;
+            font-size: 13px;
+            color: #5a5c69;
+            line-height: 1.8;
+        }
+
+        .legend span {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            margin-right: 10px;
+            vertical-align: middle;
+            border-radius: 4px;
+        }
+
+        h2 {
+            margin-top: 0;
+            font-size: 17px;
+            color: #333;
+            border-bottom: 2px solid #eaecf4;
+            padding-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .step-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #4e73df;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        #alert-box {
+            color: #e74a3b;
+            font-size: 13px;
+            font-weight: bold;
+            margin-top: 10px;
+            min-height: 38px;
+            text-align: center;
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
+
 <body>
     <div id="ui-panel">
         <h2>Mô phỏng Đồ án (V6 - Full Cảm biến)</h2>
-        
+
         <p class="step-title">1. Tương tác Vật lý</p>
         <button onclick="setLidState('open')">Nhấc nắp hộp lên</button>
         <button onclick="setLidState('close')">Đậy nắp hộp xuống</button>
         <button onclick="triggerVibration()" style="background: #f6c23e; color: #333;">Cố tình cạy / Lắc hộp</button>
 
         <p class="step-title" style="margin-top: 15px;">2. Cảm biến Input -> MQTT</p>
-        <button onclick="triggerTouch()" style="background: #36b9cc;">Chạm Cảm biến TTP223 (Input 1)</button>
-        
-        <p class="step-title" style="margin-top: 15px;">3. Lệnh MQTT -> Output 1</p>
-        <button class="btn-lock" onclick="setServoState('lock')">ESP32 nhận lệnh Khóa</button>
-        <button class="btn-unlock" onclick="setServoState('unlock')">ESP32 nhận lệnh Mở</button>
+        <button onclick="rotateEncoder()" style="background: #36b9cc;">Xoay Encoder (+5 phút)</button>
+        <button onclick="pressEncoderButton()" style="background: #f6c23e; color: #333;">Nhấn nút Xác nhận
+            (Khóa)</button>
+
+        <p class="step-title" style="margin-top: 15px;">3. Giao diện Web (Dashboard)</p>
+        <button class="btn-unlock" onclick="emergencyAbort()">HỦY KHẨN CẤP (Giới hạn: 1 Lần)</button>
 
         <div id="alert-box"></div>
 
         <div class="legend" style="margin-top: 10px; font-size: 12px;">
             <strong>Chú thích:</strong><br>
-            <div><span style="background: #36b9cc;"></span> <b>TTP223</b> (Cảm biến chạm ngoài)</div>
-            <div><span style="background: #4e73df;"></span> <b>SW-420</b> (Cảm biến rung bên trong)</div>
-            <div><span style="background: #e74a3b;"></span> Móc L | <span style="background: #343a40;"></span> Servo | <span style="background: #f6c23e;"></span> Tay đòn</div>
+            <div><span style="background: #36b9cc;"></span> <b>KY-040</b> (Xoay/Nhấn) | <span
+                    style="background: #4e73df;"></span> <b>SW-420</b> (Rung)</div>
+            <div><span style="background: #1cc88a;"></span> <b>LCD 1602</b> | <span style="background: #000000;"></span>
+                <b>Còi Buzzer</b>
+            </div>
+            <div><span style="background: #e74a3b;"></span> Móc | <span style="background: #343a40;"></span> Servo |
+                <span style="background: #f6c23e;"></span> Tay đòn
+            </div>
         </div>
     </div>
 
@@ -62,10 +145,10 @@
         // --- 1. KHỞI TẠO SCENE & CAMERA ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0xf4f6f9);
-        
+
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(20, 25, 35); 
-        
+        camera.position.set(20, 25, 35);
+
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
@@ -78,7 +161,7 @@
         // --- 2. ÁNH SÁNG ---
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
-        
+
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
         dirLight.position.set(15, 30, 20);
         dirLight.castShadow = true;
@@ -98,7 +181,7 @@
         }
 
         // --- 4. DỰNG MÔ HÌNH VẬT LÝ CHI TIẾT ---
-        
+
         // A. Thân hộp (Cố định, Kích thước X=20, Y=10, Z=16)
         const baseGeo = new THREE.BoxGeometry(20, 10, 16);
         const baseBox = new THREE.Mesh(baseGeo, boxMat);
@@ -108,7 +191,7 @@
 
         // B. Điện thoại (Nằm dọc theo trục Z ở giữa hộp)
         const phoneGroup = new THREE.Group();
-        phoneGroup.position.set(0, 0.4, 0); 
+        phoneGroup.position.set(0, 0.4, 0);
         scene.add(phoneGroup);
         const phoneBody = new THREE.Mesh(new THREE.BoxGeometry(8, 0.4, 14), new THREE.MeshLambertMaterial({ color: 0x333333 }));
         phoneGroup.add(phoneBody);
@@ -128,7 +211,21 @@
         const vibSensor = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3, 1), vibSensorMat);
         vibSensor.position.set(-8, 3, -7.5); // Nằm góc trong cùng
         scene.add(vibSensor);
-        
+
+        // B3. Màn hình LCD 1602 (Gắn ở mặt trước hộp)
+        const lcdMatOff = new THREE.MeshLambertMaterial({ color: 0x2c3e50 }); // Màn hình tắt (Xanh đậm)
+        const lcdMatOn = new THREE.MeshLambertMaterial({ color: 0x1cc88a });  // Màn hình sáng (Xanh lá)
+        const lcdMesh = new THREE.Mesh(new THREE.BoxGeometry(6, 2, 0.5), lcdMatOff);
+        lcdMesh.position.set(0, 5, 8.25); // Nằm chính giữa vách trước
+        scene.add(lcdMesh);
+
+        // B4. Còi Buzzer 5V (Gắn ở vách hông phải)
+        const buzzerMat = new THREE.MeshLambertMaterial({ color: 0x111111 }); // Còi đen
+        const buzzerMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 1, 16), buzzerMat);
+        buzzerMesh.position.set(10.25, 5, 0);
+        buzzerMesh.rotation.z = Math.PI / 2;
+        scene.add(buzzerMesh);
+
         // Biến lưu trữ hiệu ứng rung
         let isShaking = false;
         let shakeFrames = 0;
@@ -137,7 +234,7 @@
 
         // C. Nắp hộp
         const lidGroup = new THREE.Group();
-        lidGroup.position.set(0, 10, 0); 
+        lidGroup.position.set(0, 10, 0);
         scene.add(lidGroup);
         const lidMesh = new THREE.Mesh(new THREE.BoxGeometry(20, 0.8, 16), boxMat);
         lidMesh.position.set(0, 0.4, 0);
@@ -147,20 +244,20 @@
         // D. MÓC CHỮ L ĐỎ (Gắn sát vách trước hộp Z=5.5)
         const latchGroup = new THREE.Group();
         lidGroup.add(latchGroup);
-        
+
         // Cột thẳng đứng của móc
         const latchVert = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3, 1.5), latchMat);
-        latchVert.position.set(0, -1.5, 5.5); 
+        latchVert.position.set(0, -1.5, 5.5);
         latchGroup.add(latchVert);
-        
+
         // Gờ móc ngang (Đưa dài về phía Servo để kẹp)
         const latchLip = new THREE.Mesh(new THREE.BoxGeometry(3, 0.8, 1.5), latchMat);
-        latchLip.position.set(-0.75, -2.6, 5.5); 
+        latchLip.position.set(-0.75, -2.6, 5.5);
         latchGroup.add(latchLip);
 
         // E. ĐỘNG CƠ SERVO (Gắn cùng trục Z=5.5 với móc)
         const servo = new THREE.Mesh(new THREE.BoxGeometry(4, 5, 3), servoMat);
-        servo.position.set(-4.5, 5, 5.5); 
+        servo.position.set(-4.5, 5, 5.5);
         scene.add(servo);
 
         // Trục kim loại quay
@@ -174,11 +271,11 @@
         scene.add(pivot);
 
         const horn = new THREE.Mesh(new THREE.BoxGeometry(5.5, 0.5, 1.2), hornMat);
-        horn.position.set(2, 0, 0); 
+        horn.position.set(2, 0, 0);
         pivot.add(horn);
 
-       // --- 5. LOGIC ĐIỀU KHIỂN & VẬT LÝ ---
-        let targetLidY = 10; 
+        // --- 5. LOGIC ĐIỀU KHIỂN & VẬT LÝ ---
+        let targetLidY = 10;
         let targetHornAngle = Math.PI / 2; // Mặc định mở
         pivot.rotation.y = targetHornAngle;
 
@@ -190,25 +287,113 @@
             setTimeout(() => alertBox.innerText = '', 4000);
         }
 
-        // CẢM BIẾN 1: TTP223
-        window.triggerTouch = function() {
-            if (targetLidY > 10.1) {
-                showAlert("Vui lòng đậy nắp trước khi bấm khóa!", '#f6c23e');
+        // --------------------------------------------------
+        // LOGIC TỰ ĐỘNG HÓA VÀ QUẢN LÝ TRẠNG THÁI (STATE MANAGEMENT)
+        // --------------------------------------------------
+        let currentSetTime = 0;
+        let countdownTimer = null;
+        let isBuzzerRinging = false;
+        let buzzerBlinkFrames = 0;
+
+        let isSessionActive = false; // Biến trạng thái "Khóa cứng"
+        let emergencyUsed = false;   // Mô phỏng Database: Đã dùng quyền Hủy khẩn cấp chưa?
+
+        // INPUT 1: XOAY ENCODER (Thành viên 1)
+        window.rotateEncoder = function () {
+            if (isSessionActive) {
+                showAlert("Đang khóa cứng, không thể chỉnh sửa thời gian!", '#e74a3b');
                 return;
             }
-            showAlert("Input 1 kích hoạt! Đang gửi MQTT báo khóa...", '#36b9cc');
-            // Tự động kích hoạt Servo sau 1 giây (Mô phỏng độ trễ mạng MQTT)
-            setTimeout(() => { setServoState('lock'); }, 1000);
+            currentSetTime += 5;
+            showAlert("Đã xoay Encoder: Đặt thời gian " + currentSetTime + " phút", '#36b9cc');
         }
 
-        // CẢM BIẾN 2: SW-420 (Rung lắc)
-        window.triggerVibration = function() {
-            showAlert("CẢNH BÁO AN NINH: Phát hiện rung lắc! Đã gửi Email.", '#e74a3b');
-            isShaking = true;
-            shakeFrames = 30; // Rung trong 30 khung hình
+        // INPUT 1: NHẤN XÁC NHẬN (Thành viên 1) -> TỰ ĐỘNG KÍCH HOẠT OUTPUT 1 & 2
+        window.pressEncoderButton = function () {
+            if (isSessionActive) return; // Đang chạy thì vô hiệu hóa nút
+            if (currentSetTime === 0) {
+                showAlert("Chưa thiết lập thời gian! Vui lòng xoay Encoder trước.", '#f6c23e');
+                return;
+            }
+            if (targetLidY > 10.1) {
+                showAlert("Vui lòng đậy nắp trước khi xác nhận khóa!", '#f6c23e');
+                return;
+            }
+
+            showAlert("Xác nhận! ESP32 báo lên Web. Tự động đóng chốt & đếm ngược...", '#36b9cc');
+
+            // MÔ PHỎNG CHUỖI TỰ ĐỘNG TỪ NODE-RED
+            setTimeout(() => {
+                isSessionActive = true; // Bật cờ khóa cứng
+                setServoState('lock');  // Tự động Khóa (TV2)
+
+                // Tự động đếm ngược LCD (TV3)
+                lcdMesh.material = lcdMatOn;
+                if (countdownTimer) clearTimeout(countdownTimer);
+                countdownTimer = setTimeout(() => {
+                    lcdMesh.material = lcdMatOff;
+                    triggerBuzzer();
+                }, 4000); // Giả lập 4 giây
+
+                currentSetTime = 0; // Reset số trên núm xoay
+            }, 1000);
         }
 
-        window.setLidState = function(state) {
+        // NÚT TRÊN WEB: HỦY KHẨN CẤP (Kiểm tra Database & Hủy phiên)
+        window.emergencyAbort = function () {
+            if (!isSessionActive) {
+                showAlert("Hộp đang mở, không có phiên tập trung nào để hủy.", '#858796');
+                return;
+            }
+            if (emergencyUsed) {
+                showAlert("TỪ CHỐI: Bạn đã hết lượt Hủy khẩn cấp trong tuần này!", '#e74a3b');
+                // Lắc nhẹ báo lỗi
+                pivot.rotation.y = -0.1;
+                setTimeout(() => pivot.rotation.y = 0, 150);
+                return;
+            }
+
+            // Xóa bộ đếm ngược
+            clearTimeout(countdownTimer);
+            lcdMesh.material = lcdMatOff;
+            isSessionActive = false; // Mở cờ khóa cứng
+            emergencyUsed = true;    // Ghi nhận đã dùng quyền Hủy
+
+            setServoState('unlock');
+            showAlert("ĐÃ HỦY KHẨN CẤP! Ghi log 'Thất bại' lên Google Sheets.", '#e74a3b');
+        }
+
+        // LOGIC SERVO (Đã gộp chống kẹt nắp & Khóa cứng)
+        window.setServoState = function (state) {
+            if (state === 'unlock' && isSessionActive) {
+                showAlert("TỪ CHỐI LỆNH MỞ! Khóa cứng đang kích hoạt.", '#e74a3b');
+                // Lắc nhẹ servo báo lỗi
+                pivot.rotation.y = -0.1;
+                setTimeout(() => pivot.rotation.y = 0, 150);
+                return;
+            }
+            if (targetLidY > 10.1 && state === 'lock') {
+                showAlert("KHÔNG THỂ KHÓA! Hãy đậy sát nắp hộp.");
+                return;
+            }
+            targetHornAngle = (state === 'lock') ? 0 : Math.PI / 2;
+        }
+
+        // OUTPUT 2: HẾT GIỜ KÊU CÒI VÀ TỰ ĐỘNG MỞ (Thành viên 3)
+        window.triggerBuzzer = function () {
+            showAlert("HOÀN THÀNH MỤC TIÊU! Còi Buzzer phát âm báo...", '#1cc88a');
+            isBuzzerRinging = true;
+            buzzerBlinkFrames = 80;
+
+            // Auto-Unlock sau khi hết báo thức
+            setTimeout(() => {
+                isSessionActive = false; // Tắt khóa cứng
+                setServoState('unlock');
+                showAlert("Node-RED ghi nhận 'Thành công'. Servo tự động mở khóa.", '#1cc88a');
+            }, 2000);
+        }
+
+        window.setLidState = function (state) {
             // Logic chống cạy: Nếu đang khóa mà cố tình mở -> Kích hoạt cảm biến rung
             if (targetHornAngle < 0.1 && targetHornAngle > -0.1 && state === 'open') {
                 triggerVibration();
@@ -220,18 +405,24 @@
             targetLidY = (state === 'open') ? 17 : 10;
         }
 
-        window.setServoState = function(state) {
-            if (targetLidY > 10.1 && state === 'lock') {
-                showAlert("KHÔNG THỂ KHÓA! Hãy đậy sát nắp hộp.");
-                return;
+        // CẢM BIẾN 2: SW-420 (Xử lý rung lắc & Cạy phá)
+        window.triggerVibration = function() {
+            // Logic bảo vệ UX: Chỉ báo động nếu hộp ĐÃ KHÓA (Góc servo nhỏ hơn 0.1)
+            if (targetHornAngle > 0.1) {
+                showAlert("Thông báo: Hộp đang mở, hệ thống an ninh tạm tắt để di chuyển an toàn.", '#36b9cc');
+                return; 
             }
-            targetHornAngle = (state === 'lock') ? 0 : Math.PI / 2;
+            
+            // Nếu hộp đang khóa mà bị tác động
+            showAlert("CẢNH BÁO AN NINH: Phát hiện rung lắc! Đã gửi Email cảnh báo.", '#e74a3b');
+            isShaking = true;
+            shakeFrames = 30; // Tạo hiệu ứng rung mô hình trong 30 khung hình
         }
 
         // Vòng lặp Render (Lerp Animation + Shake Effect)
         function animate() {
             requestAnimationFrame(animate);
-            
+
             // 1. Hiệu ứng đóng mở nắp & xoay servo
             lidGroup.position.y += (targetLidY - lidGroup.position.y) * 0.15;
             pivot.rotation.y += (targetHornAngle - pivot.rotation.y) * 0.15;
@@ -240,10 +431,10 @@
             if (isShaking && shakeFrames > 0) {
                 const shakeX = (Math.random() - 0.5) * 0.8;
                 const shakeZ = (Math.random() - 0.5) * 0.8;
-                
+
                 baseBox.position.set(originalBasePos.x + shakeX, originalBasePos.y, originalBasePos.z + shakeZ);
                 // Giữ nắp dính liền với thân khi rung
-                if(targetLidY === 10) {
+                if (targetLidY === 10) {
                     lidMesh.position.set(originalLidPos.x + shakeX, originalLidPos.y, originalLidPos.z + shakeZ);
                 }
                 shakeFrames--;
@@ -253,6 +444,19 @@
                 baseBox.position.copy(originalBasePos);
                 lidMesh.position.copy(originalLidPos);
                 lidMesh.position.y = 0.4; // Offset cố định của mesh
+            }
+
+            // 3. Hiệu ứng Còi Buzzer kêu báo động (Phóng to thu nhỏ đổi màu)
+            if (isBuzzerRinging && buzzerBlinkFrames > 0) {
+                const scale = 1 + Math.sin(buzzerBlinkFrames * 0.5) * 0.3;
+                buzzerMesh.scale.set(1, scale, scale);
+                // Nhấp nháy màu đỏ - đen
+                buzzerMesh.material.color.setHex((buzzerBlinkFrames % 10 < 5) ? 0xe74a3b : 0x111111);
+                buzzerBlinkFrames--;
+            } else if (isBuzzerRinging && buzzerBlinkFrames <= 0) {
+                isBuzzerRinging = false;
+                buzzerMesh.scale.set(1, 1, 1);
+                buzzerMesh.material.color.setHex(0x111111); // Trả về màu đen mặc định
             }
 
             renderer.render(scene, camera);
@@ -266,4 +470,5 @@
         });
     </script>
 </body>
+
 </html>
